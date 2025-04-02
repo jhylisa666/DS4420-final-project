@@ -13,8 +13,6 @@ RESTAURANT_FEATURES = [
     "price",
     "Rambience",
     "area",
-    "Rcuisine",
-    "parking_lot",
 ]
 
 
@@ -87,19 +85,11 @@ def _preprocess_restaurant_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def _load_data() -> pd.DataFrame:
     """
-    Loads the restaurant data from CSV files and merges them into a single DataFrame
-    containing the relevant features.
+    Loads the restaurant data from CSV files and returns a DataFrame containing the restaurant features.
     """
-    restaurants_df = pd.read_csv("../food_data/geoplaces2.csv")
-    cuisine_df = pd.read_csv("../food_data/chefmozcuisine.csv")
-    parking_df = pd.read_csv("../food_data/chefmozparking.csv")
-
-    merged_df = pd.merge(
-        pd.merge(restaurants_df, cuisine_df, on="placeID"), parking_df, on="placeID"
-    )[RESTAURANT_FEATURES]
-    merged_df.set_index("placeID", inplace=True)
-
-    return merged_df
+    restaurants_df = pd.read_csv("../food_data/geoplaces2.csv")[RESTAURANT_FEATURES]
+    restaurants_df.set_index("placeID", inplace=True)
+    return restaurants_df
 
 
 def get_restaurant_similarities(
@@ -126,19 +116,19 @@ def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     user_ids, restaurant_ids, ratings = [], [], []
     ratings_df = pd.read_csv("../food_data/rating_final.csv")
-    ratings_df = ratings_df.pivot(index="userID", columns="placeID", values="rating")
-
-    for index in ratings_df.index:
+    
+    unique_user_ids = ratings_df["userID"].unique()
+    for index in unique_user_ids:
         # Get all the rated restaurants for the current user
-        non_nan_values = ratings_df.loc[index][ratings_df.loc[index].notna()]
+        non_nan_values = ratings_df[ratings_df["userID"] == index]
         assert len(non_nan_values) > 0, f"User {index} has no rated restaurants."
 
         # Randomly select one restaurant to be the test set
-        random_restaurant = np.random.choice(non_nan_values.index)
-        rating = non_nan_values[random_restaurant]
+        random_restaurant = np.random.choice(non_nan_values["placeID"])
+        rating = non_nan_values[non_nan_values["placeID"] == random_restaurant]["rating"].values[0]
 
         # Set the rating for the selected restaurant to NaN in the training set
-        ratings_df.loc[index, random_restaurant] = np.nan
+        ratings_df.loc[(ratings_df["userID"] == index) & (ratings_df["placeID"] == random_restaurant), "rating"] = np.nan
 
         user_ids.append(index)
         restaurant_ids.append(random_restaurant)
@@ -147,3 +137,12 @@ def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return ratings_df, pd.DataFrame(
         {"userID": user_ids, "placeID": restaurant_ids, "rating": ratings}
     )
+
+if __name__ == "__main__":
+    import math
+
+    NUM_UNIQUE_RESTAURANTS = 130
+    assert len(get_restaurant_similarities()) == math.comb(NUM_UNIQUE_RESTAURANTS, 2)
+    assert get_train_test_split()[0]["placeID"].nunique() == NUM_UNIQUE_RESTAURANTS
+
+    print("All tests passed!")

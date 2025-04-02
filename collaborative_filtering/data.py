@@ -36,6 +36,11 @@ def _get_similarities(
     """
     Computes the pairwise similarities between items. Assumes that the row index of the DataFrame contains the itemID
     and that each row corresponds to a different item.
+
+    Args:
+        - df (pd.DataFrame): a DataFrame containing the item features
+        - distance_metric (str): the distance metric to use for computing similarities
+        - type (str): the type of items ("user" or "restaurant")
     """
     assert type in ["user", "restaurant"], f"Type {type} not supported."
     assert distance_metric in [
@@ -85,18 +90,26 @@ def _get_user_similarities(
     """
     Computes the pairwise user similarities.
 
+    Args:
+        - df (pd.DataFrame): a DataFrame containing the user features
+        - distance_metric (str): the distance metric to use for computing similarities
+
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "user_1," "user_2", and "similarity"
     """
     return _get_similarities(df, distance_metric, type="user")
 
 
-def _get_item_similarities(
+def _get_restaurant_similarities(
     df: pd.DataFrame,
     distance_metric: str = "cosine_similarity",
 ) -> pd.DataFrame:
     """
     Computes the pairwise restaurant similarities.
+
+    Args:
+        - df (pd.DataFrame): a DataFrame containing the restaurant features
+        - distance_metric (str): the distance metric to use for computing similarities
 
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
@@ -108,6 +121,13 @@ def _preprocess_data(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
     """
     Converts all categorical features to numerical values.
     Uses a memory-efficient, lower-dimensional binary encoding for the categorical features.
+
+    Args:
+        - df (pd.DataFrame): a DataFrame containing the item features
+        - features (List[str]): a list of feature names to be encoded
+
+    Returns:
+        - df (pd.DataFrame): a DataFrame with the encoded features
     """
     encoder = ce.BinaryEncoder(cols=features)
     df = encoder.fit_transform(df)
@@ -142,16 +162,22 @@ def get_restaurant_similarities(
     """
     Loads the data, pre-processes it, and computes the pairwise restaurant similarities.
 
+    Args:
+        - distance_metric (str): the distance metric to use for computing similarities
+
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
     """
     df = _preprocess_data(_load_restaurant_data(), RESTAURANT_FEATURES[1:])
-    return _get_item_similarities(df, distance_metric)
+    return _get_restaurant_similarities(df, distance_metric)
 
 
 def get_user_similarities(distance_metric: str = "cosine_similarity") -> pd.DataFrame:
     """
     Loads the data, pre-processes it, and computes the pairwise user similarities.
+
+    Args:
+        - distance_metric (str): the distance metric to use for computing similarities
 
     Returns:
         - similarities (pd.DataFrame): a DataFrame with 3 columns "user_1," "user_2", and "similarity"

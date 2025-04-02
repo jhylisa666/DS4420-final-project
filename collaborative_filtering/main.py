@@ -8,7 +8,16 @@ from sklearn.metrics import classification_report
 
 
 class HybridFiltering:
-    """Hybrid filtering class for restaurant recommendation."""
+    """
+    Hybrid filtering class for restaurant recommendation.
+    
+    Steps:
+    1. Given a target user and target restaurant, find the top K most similar restaurants to the target restaurant.
+    2. For each restaurant, find the users who have rated that restaurant.
+    3. For each user, find the top K most similar users to the target user.
+    4. Compute the predicted rating of the restaurant as the weighted user similarity of the ratings of the top K similar users.
+    5. Compute the predicted rating of the restaurant as the weighted item similarity of these ratings.
+    """
 
     def __init__(
         self,
@@ -18,14 +27,14 @@ class HybridFiltering:
         self.user_similarities_df = get_user_similarities(distance_metric)
         self.train_df, _ = get_train_test_split()
 
-    def predict(self, user_id: int, restaurant_id: int, k: int = 5) -> float:
+    def predict(self, user_id: int, restaurant_id: int, k: int = 3) -> float:
         """
         Predicts the rating for a given user and restaurant using content-based filtering.
 
         Args:
-            user_id (int): The ID of the user.
-            restaurant_id (int): The ID of the restaurant.
-            k (int): The number of similar restaurants to consider.
+            - user_id (int): The ID of the user.
+            - restaurant_id (int): The ID of the restaurant.
+            - k (int): The number of similar restaurants to consider.
 
         Returns:
             float: The predicted rating for the restaurant by the user.
@@ -111,20 +120,8 @@ class HybridFiltering:
 
 
 def main():
-    """
-    1. Compute pairwise similarities between restaurants based on their attributes.
-    2. Given a target restaurant, find the top K most similar restaurants to it.
-    3. Get the average rating of each of these top K restaurants and compute the target restaurant
-    rating as the weighted average of these ratings based on restaurant similarity. -> Get the
-    weighted average using the user's rating of these restaurants and the restaurant similarity. Use average rating of user
-    if the restaurant was not rated by the user.
+    """Main function to test the HybridFiltering class."""
 
-    Or, given a target user and item, we can find the top K most similar items to the target item. Then,
-    for each item, among the users that have rated that item, we can find the top K most similar users to the target user.
-    We can compute the predicted rating of the item as the weighted user similarity of the ratings of the top K similar users.
-    Repeat this predicted item rating for all items and then compute the weighted item similarity of these ratings.
-
-    """
     hf = HybridFiltering(distance_metric="jaccard_similarity")
     _, test_df = get_train_test_split()
     preds, gt = [], test_df["rating"].values
@@ -142,7 +139,6 @@ def main():
             preds.append(0)
 
     print(classification_report(y_true=gt, y_pred=preds, zero_division=0))
-
 
 if __name__ == "__main__":
     main()

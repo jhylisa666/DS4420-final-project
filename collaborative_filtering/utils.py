@@ -8,6 +8,7 @@ def cosine_similarity(X: np.ndarray, Y: np.ndarray) -> float:
 
 
 def jaccard_similarity(X: np.ndarray, Y: np.ndarray) -> float:
+    """Standard Jaccard similarity function."""
     assert all(x in [0, 1] for x in X) and all(
         y in [0, 1] for y in Y
     ), "X and Y must be binary vectors."

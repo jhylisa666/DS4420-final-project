@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
+from utils import cosine_similarity, euclidean_distance
 import category_encoders as ce
 
 RESTAURANT_FEATURES = [
@@ -16,13 +16,20 @@ RESTAURANT_FEATURES = [
 ]
 
 
-def _get_item_similarities(df: pd.DataFrame) -> pd.DataFrame:
+def _get_item_similarities(
+    df: pd.DataFrame, distance_metric: str = "cosine_similarity"
+) -> pd.DataFrame:
     """
     Computes the pairwise restaurant similarities.
 
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
     """
+    assert distance_metric in [
+        "euclidean_distance",
+        "cosine_similarity",
+    ], f"Distance metric {distance_metric} not supported."
+
     restaurant_1, restaurant_2, similarities = [], [], []
     for i in range(df.shape[0]):
         for j in range(i + 1, df.shape[0]):
@@ -31,16 +38,23 @@ def _get_item_similarities(df: pd.DataFrame) -> pd.DataFrame:
                 df.iloc[i, :].values,
                 df.iloc[j, :].values,
             )
-            similarity = cosine_similarity(
-                restaurant_1_vector.reshape(1, -1), restaurant_2_vector.reshape(1, -1)
-            )[0][0]
+            if distance_metric == "euclidean_distance":
+                similarity = -euclidean_distance(
+                    restaurant_1_vector, restaurant_2_vector
+                )
+            elif distance_metric == "cosine_similarity":
+                similarity = cosine_similarity(restaurant_1_vector, restaurant_2_vector)
 
             restaurant_1.append(restaurant_1_id)
             restaurant_2.append(restaurant_2_id)
             similarities.append(similarity)
 
     return pd.DataFrame(
-        {"restaurant_1": restaurant_1, "restaurant_2": restaurant_2, "similarity": similarities}
+        {
+            "restaurant_1": restaurant_1,
+            "restaurant_2": restaurant_2,
+            "similarity": similarities,
+        }
     )
 
 

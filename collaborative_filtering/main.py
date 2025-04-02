@@ -67,6 +67,12 @@ def main():
     rating as the weighted average of these ratings based on restaurant similarity. -> Get the
     weighted average using the user's rating of these restaurants and the restaurant similarity. Use average rating of user
     if the restaurant was not rated by the user.
+
+    Or, given a target user and item, we can find the top K most similar items to the target item. Then,
+    for each item, among the users that have rated that item, we can find the top K most similar users to the target user.
+    We can compute the predicted rating of the item as the weighted user similarity of the ratings of the top K similar users.
+    Repeat this predicted item rating for all items and then compute the weighted item similarity of these ratings.
+
     """
     cbf = ContentBasedFiltering(distance_metric="cosine_similarity")
     _, test_df = get_train_test_split()
@@ -78,7 +84,7 @@ def main():
         print(
             f"Predicted rating for restaurant {restaurant_id}: {predicted_rating:.2f}"
         )
-        if index == 10:
+        if index == 0:
             break
 
 

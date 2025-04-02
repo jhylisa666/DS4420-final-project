@@ -57,6 +57,7 @@ def _get_similarities(
             elif distance_metric == "cosine_similarity":
                 similarity = cosine_similarity(item_1_vector, item_2_vector)
             elif distance_metric == "weighted_cosine_similarity":
+                assert len(item_1_vector) == len(weights), f"Weights length {len(weights)} does not match number of features {len(item_1_vector)}."
                 similarity = weighted_cosine_similarity(
                     item_1_vector, item_2_vector, weights
                 )
@@ -98,9 +99,6 @@ def _get_user_similarities(
         assert (
             weights is not None
         ), "Weights must be provided for weighted cosine similarity."
-        assert (
-            len(weights) == len(USER_FEATURES) - 1
-        ), f"Weights length {len(weights)} does not match number of features {len(USER_FEATURES) - 1}."
 
     return _get_similarities(df, distance_metric, weights, type="user")
 
@@ -120,9 +118,6 @@ def _get_item_similarities(
         assert (
             weights is not None
         ), "Weights must be provided for weighted cosine similarity."
-        assert (
-            len(weights) == len(RESTAURANT_FEATURES) - 1
-        ), f"Weights length {len(weights)} does not match number of features {len(RESTAURANT_FEATURES) - 1}."
 
     return _get_similarities(df, distance_metric, weights, type="restaurant")
 

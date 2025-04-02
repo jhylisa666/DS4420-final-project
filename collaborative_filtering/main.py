@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 from data import (
     get_train_test_split,
@@ -7,6 +6,7 @@ from data import (
     RESTAURANT_FEATURES,
     USER_FEATURES,
 )
+from sklearn.metrics import classification_report
 
 
 class HybridFiltering:
@@ -23,7 +23,6 @@ class HybridFiltering:
         )
         self.user_similarities_df = get_user_similarities(distance_metric, user_weights)
         self.train_df, _ = get_train_test_split()
-        self.user_similarities_df.to_csv('output.csv', index=False)
 
     def predict(self, user_id: int, restaurant_id: int, k: int = 5) -> float:
         """
@@ -70,7 +69,9 @@ class HybridFiltering:
             user_ids = user_ratings_df["userID"].values
             if user_id in user_ids:
                 user_ids = np.delete(user_ids, np.where(user_ids == user_id))
-            assert user_id not in user_ids, "Cannot include the target user as a similar user."
+            assert (
+                user_id not in user_ids
+            ), "Cannot include the target user as a similar user."
 
             user_similarities_df = self.user_similarities_df[
                 (
@@ -132,18 +133,21 @@ def main():
     """
     hf = HybridFiltering(distance_metric="cosine_similarity")
     _, test_df = get_train_test_split()
-    print(test_df.head(5))
+    preds, gt = [], test_df["rating"].values
 
     for index in range(test_df.shape[0]):
         user_id = test_df.iloc[index]["userID"]
         restaurant_id = test_df.iloc[index]["placeID"]
-        predicted_rating = hf.predict(user_id, restaurant_id, k=5)
-        print(
-            f"Predicted rating for user {user_id} restaurant {restaurant_id}: {predicted_rating:.2f}"
-        )
-        if index == 5:
-            break
+        predicted_rating = hf.predict(user_id, restaurant_id, k=3)
+        
+        if predicted_rating > 1.3:
+            preds.append(2)
+        elif predicted_rating > 0.7:
+            preds.append(1)
+        else:
+            preds.append(0)
 
+    print(classification_report(y_true=gt, y_pred=preds, zero_division=0))
 
 if __name__ == "__main__":
     main()

@@ -3,8 +3,6 @@ from data import (
     get_train_test_split,
     get_restaurant_similarities,
     get_user_similarities,
-    RESTAURANT_FEATURES,
-    USER_FEATURES,
 )
 from sklearn.metrics import classification_report
 
@@ -15,13 +13,9 @@ class HybridFiltering:
     def __init__(
         self,
         distance_metric: str = "cosine_similarity",
-        restaurant_weights=[1.0 for _ in range(len(RESTAURANT_FEATURES) - 1)],
-        user_weights=[1.0 for _ in range(len(USER_FEATURES) - 1)],
     ):
-        self.restaurant_similarities_df = get_restaurant_similarities(
-            distance_metric, restaurant_weights
-        )
-        self.user_similarities_df = get_user_similarities(distance_metric, user_weights)
+        self.restaurant_similarities_df = get_restaurant_similarities(distance_metric)
+        self.user_similarities_df = get_user_similarities(distance_metric)
         self.train_df, _ = get_train_test_split()
 
     def predict(self, user_id: int, restaurant_id: int, k: int = 5) -> float:
@@ -131,7 +125,7 @@ def main():
     Repeat this predicted item rating for all items and then compute the weighted item similarity of these ratings.
 
     """
-    hf = HybridFiltering(distance_metric="cosine_similarity")
+    hf = HybridFiltering(distance_metric="jaccard_similarity")
     _, test_df = get_train_test_split()
     preds, gt = [], test_df["rating"].values
 
@@ -139,7 +133,7 @@ def main():
         user_id = test_df.iloc[index]["userID"]
         restaurant_id = test_df.iloc[index]["placeID"]
         predicted_rating = hf.predict(user_id, restaurant_id, k=3)
-        
+
         if predicted_rating > 1.3:
             preds.append(2)
         elif predicted_rating > 0.7:
@@ -148,6 +142,7 @@ def main():
             preds.append(0)
 
     print(classification_report(y_true=gt, y_pred=preds, zero_division=0))
+
 
 if __name__ == "__main__":
     main()

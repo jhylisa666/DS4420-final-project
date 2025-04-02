@@ -1,5 +1,5 @@
 import pandas as pd
-from utils import cosine_similarity, euclidean_distance, weighted_cosine_similarity
+from utils import cosine_similarity, jaccard_similarity
 import category_encoders as ce
 import numpy as np
 from typing import Tuple, List
@@ -31,7 +31,7 @@ USER_FEATURES = [
 
 
 def _get_similarities(
-    df: pd.DataFrame, distance_metric: str, weights: np.ndarray, type: str = "user"
+    df: pd.DataFrame, distance_metric: str, type: str = "user"
 ) -> pd.DataFrame:
     """
     Computes the pairwise similarities between items. Assumes that the row index of the DataFrame contains the itemID
@@ -39,9 +39,8 @@ def _get_similarities(
     """
     assert type in ["user", "restaurant"], f"Type {type} not supported."
     assert distance_metric in [
-        "euclidean_distance",
         "cosine_similarity",
-        "weighted_cosine_similarity",
+        "jaccard_similarity",
     ], f"Distance metric {distance_metric} not supported."
 
     item_1, item_2, similarities = [], [], []
@@ -52,15 +51,10 @@ def _get_similarities(
                 df.iloc[i, :].values,
                 df.iloc[j, :].values,
             )
-            if distance_metric == "euclidean_distance":
-                similarity = -euclidean_distance(item_1_vector, item_2_vector)
-            elif distance_metric == "cosine_similarity":
+            if distance_metric == "cosine_similarity":
                 similarity = cosine_similarity(item_1_vector, item_2_vector)
-            elif distance_metric == "weighted_cosine_similarity":
-                assert len(item_1_vector) == len(weights), f"Weights length {len(weights)} does not match number of features {len(item_1_vector)}."
-                similarity = weighted_cosine_similarity(
-                    item_1_vector, item_2_vector, weights
-                )
+            elif distance_metric == "jaccard_similarity":
+                similarity = jaccard_similarity(item_1_vector, item_2_vector)
 
             item_1.append(item_1_id)
             item_2.append(item_2_id)
@@ -87,7 +81,6 @@ def _get_similarities(
 def _get_user_similarities(
     df: pd.DataFrame,
     distance_metric: str = "cosine_similarity",
-    weights: np.ndarray = None,
 ) -> pd.DataFrame:
     """
     Computes the pairwise user similarities.
@@ -95,18 +88,12 @@ def _get_user_similarities(
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "user_1," "user_2", and "similarity"
     """
-    if distance_metric == "weighted_cosine_similarity":
-        assert (
-            weights is not None
-        ), "Weights must be provided for weighted cosine similarity."
-
-    return _get_similarities(df, distance_metric, weights, type="user")
+    return _get_similarities(df, distance_metric, type="user")
 
 
 def _get_item_similarities(
     df: pd.DataFrame,
     distance_metric: str = "cosine_similarity",
-    weights: np.ndarray = None,
 ) -> pd.DataFrame:
     """
     Computes the pairwise restaurant similarities.
@@ -114,12 +101,7 @@ def _get_item_similarities(
     Returns:
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
     """
-    if distance_metric == "weighted_cosine_similarity":
-        assert (
-            weights is not None
-        ), "Weights must be provided for weighted cosine similarity."
-
-    return _get_similarities(df, distance_metric, weights, type="restaurant")
+    return _get_similarities(df, distance_metric, type="restaurant")
 
 
 def _preprocess_data(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
@@ -155,7 +137,7 @@ def _load_user_data() -> pd.DataFrame:
 
 
 def get_restaurant_similarities(
-    distance_metric: str = "cosine_similarity", weights: np.ndarray = None
+    distance_metric: str = "cosine_similarity",
 ) -> pd.DataFrame:
     """
     Loads the data, pre-processes it, and computes the pairwise restaurant similarities.
@@ -164,12 +146,10 @@ def get_restaurant_similarities(
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
     """
     df = _preprocess_data(_load_restaurant_data(), RESTAURANT_FEATURES[1:])
-    return _get_item_similarities(df, distance_metric, weights)
+    return _get_item_similarities(df, distance_metric)
 
 
-def get_user_similarities(
-    distance_metric: str = "cosine_similarity", weights: np.ndarray = None
-) -> pd.DataFrame:
+def get_user_similarities(distance_metric: str = "cosine_similarity") -> pd.DataFrame:
     """
     Loads the data, pre-processes it, and computes the pairwise user similarities.
 
@@ -177,7 +157,7 @@ def get_user_similarities(
         - similarities (pd.DataFrame): a DataFrame with 3 columns "user_1," "user_2", and "similarity"
     """
     df = _preprocess_data(_load_user_data(), USER_FEATURES[1:])
-    return _get_user_similarities(df, distance_metric, weights)
+    return _get_user_similarities(df, distance_metric)
 
 
 def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:

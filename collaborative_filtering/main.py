@@ -1,19 +1,31 @@
 import pandas as pd
-from data import get_train_test_split, get_restaurant_similarities, RESTAURANT_FEATURES
+import numpy as np
+from data import (
+    get_train_test_split,
+    get_restaurant_similarities,
+    get_user_similarities,
+    RESTAURANT_FEATURES,
+    USER_FEATURES,
+)
 
 
-class ContentBasedFiltering:
-    """Content-based filtering class for restaurant recommendation."""
+class HybridFiltering:
+    """Hybrid filtering class for restaurant recommendation."""
 
     def __init__(
         self,
         distance_metric: str = "cosine_similarity",
-        weights=[1.0 for _ in range(len(RESTAURANT_FEATURES) - 1)],
+        restaurant_weights=[1.0 for _ in range(len(RESTAURANT_FEATURES) - 1)],
+        user_weights=[1.0 for _ in range(len(USER_FEATURES) - 1)],
     ):
-        self.similarities_df = get_restaurant_similarities(distance_metric, weights)
+        self.restaurant_similarities_df = get_restaurant_similarities(
+            distance_metric, restaurant_weights
+        )
+        self.user_similarities_df = get_user_similarities(distance_metric, user_weights)
         self.train_df, _ = get_train_test_split()
+        self.user_similarities_df.to_csv('output.csv', index=False)
 
-    def predict(self, restaurant_id: int, k: int = 5) -> float:
+    def predict(self, user_id: int, restaurant_id: int, k: int = 5) -> float:
         """
         Predicts the rating for a given user and restaurant using content-based filtering.
 
@@ -27,9 +39,9 @@ class ContentBasedFiltering:
         """
 
         # Get the top K similar restaurants to the target restaurant
-        top_k_similarities_df = self.similarities_df[
-            (self.similarities_df["restaurant_1"] == restaurant_id)
-            | (self.similarities_df["restaurant_2"] == restaurant_id)
+        top_k_similarities_df = self.restaurant_similarities_df[
+            (self.restaurant_similarities_df["restaurant_1"] == restaurant_id)
+            | (self.restaurant_similarities_df["restaurant_2"] == restaurant_id)
         ].nlargest(k, "similarity")
 
         # Get the restaurant IDs of the top K similar restaurants
@@ -45,18 +57,62 @@ class ContentBasedFiltering:
         assert len(set(top_k_similar_restaurant_ids)) == len(top_k_similarities_df)
         assert len(top_k_similar_restaurant_ids) == k
 
-        # Get the average ratings of the top K similar restaurants
-        average_ratings = (
-            self.train_df[self.train_df["placeID"].isin(top_k_similar_restaurant_ids)]
-            .groupby("placeID")["rating"]
-            .mean()
-            .values
+        restaurant_similarities, restaurant_ratings = (
+            top_k_similarities_df["similarity"].values,
+            [],
         )
+        # For each restaurant, get the users who have rated the restaurant
+        for restaurant_id in top_k_similar_restaurant_ids:
+            user_ratings_df = self.train_df[
+                (self.train_df["placeID"] == restaurant_id)
+                & (self.train_df["rating"].notna())
+            ]
+            user_ids = user_ratings_df["userID"].values
+            if user_id in user_ids:
+                user_ids = np.delete(user_ids, np.where(user_ids == user_id))
+            assert user_id not in user_ids, "Cannot include the target user as a similar user."
 
-        # Get the similarities of the top K similar restaurants to the target restaurant
-        similarities = top_k_similarities_df["similarity"].values
+            user_similarities_df = self.user_similarities_df[
+                (
+                    (self.user_similarities_df["user_1"] == user_id)
+                    & self.user_similarities_df["user_2"].isin(user_ids)
+                )
+                | (
+                    (self.user_similarities_df["user_2"] == user_id)
+                    & self.user_similarities_df["user_1"].isin(user_ids)
+                )
+            ]
 
-        return average_ratings.dot(similarities) / similarities.sum()
+            assert len(user_similarities_df) == len(
+                user_ids
+            ), f"Found {len(user_similarities_df)} similar users for {len(user_ids)} users to {user_id} who rated the restaurant {restaurant_id}."
+            user_similarities_df = user_similarities_df.nlargest(k, "similarity")
+
+            # We want to get the ratings of the top K similar users who have rated the restaurant
+            user_similarities, user_ratings = (
+                user_similarities_df["similarity"].values,
+                [],
+            )
+            for _, row in user_similarities_df.iterrows():
+                similar_user_id = (
+                    row["user_1"] if row["user_1"] != user_id else row["user_2"]
+                )
+                user_ratings.append(
+                    user_ratings_df[user_ratings_df["userID"] == similar_user_id][
+                        "rating"
+                    ].values[0]
+                )
+
+            user_ratings = np.asarray(user_ratings)
+            restaurant_ratings.append(
+                user_ratings.dot(user_similarities) / user_similarities.sum()
+            )
+
+        restaurant_ratings = np.asarray(restaurant_ratings)
+        return (
+            restaurant_ratings.dot(restaurant_similarities)
+            / restaurant_similarities.sum()
+        )
 
 
 def main():
@@ -74,17 +130,18 @@ def main():
     Repeat this predicted item rating for all items and then compute the weighted item similarity of these ratings.
 
     """
-    cbf = ContentBasedFiltering(distance_metric="cosine_similarity")
+    hf = HybridFiltering(distance_metric="cosine_similarity")
     _, test_df = get_train_test_split()
-    print(test_df.head(10))
+    print(test_df.head(5))
 
     for index in range(test_df.shape[0]):
+        user_id = test_df.iloc[index]["userID"]
         restaurant_id = test_df.iloc[index]["placeID"]
-        predicted_rating = cbf.predict(restaurant_id, k=5)
+        predicted_rating = hf.predict(user_id, restaurant_id, k=5)
         print(
-            f"Predicted rating for restaurant {restaurant_id}: {predicted_rating:.2f}"
+            f"Predicted rating for user {user_id} restaurant {restaurant_id}: {predicted_rating:.2f}"
         )
-        if index == 0:
+        if index == 5:
             break
 
 

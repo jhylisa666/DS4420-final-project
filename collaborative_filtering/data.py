@@ -93,6 +93,17 @@ def _load_data() -> pd.DataFrame:
 
     return merged_df
 
+def get_restaurant_similarities(
+    distance_metric: str = "cosine_similarity"
+) -> pd.DataFrame:
+    """
+    Loads the data, pre-processes it, and computes the pairwise restaurant similarities.
+
+    Returns:
+      - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
+    """
+    df = _preprocess_restaurant_data(_load_data())
+    return _get_item_similarities(df, distance_metric)
 
 def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """

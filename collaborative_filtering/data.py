@@ -17,11 +17,11 @@ RESTAURANT_FEATURES = [
     "parking_lot",
 ]
 
-WEIGHTS = [1.0 for _ in range(len(RESTAURANT_FEATURES) - 1)]
-
 
 def _get_item_similarities(
-    df: pd.DataFrame, distance_metric: str = "cosine_similarity"
+    df: pd.DataFrame,
+    distance_metric: str = "cosine_similarity",
+    weights: np.ndarray = None,
 ) -> pd.DataFrame:
     """
     Computes the pairwise restaurant similarities.
@@ -34,6 +34,14 @@ def _get_item_similarities(
         "cosine_similarity",
         "weighted_cosine_similarity",
     ], f"Distance metric {distance_metric} not supported."
+
+    if distance_metric == "weighted_cosine_similarity":
+        assert (
+            weights is not None
+        ), "Weights must be provided for weighted cosine similarity."
+        assert (
+            len(weights) == len(RESTAURANT_FEATURES) - 1
+        ), f"Weights length {len(weights)} does not match number of features {len(RESTAURANT_FEATURES) - 1}."
 
     restaurant_1, restaurant_2, similarities = [], [], []
     for i in range(df.shape[0]):
@@ -51,7 +59,7 @@ def _get_item_similarities(
                 similarity = cosine_similarity(restaurant_1_vector, restaurant_2_vector)
             elif distance_metric == "weighted_cosine_similarity":
                 similarity = weighted_cosine_similarity(
-                    restaurant_1_vector, restaurant_2_vector, WEIGHTS
+                    restaurant_1_vector, restaurant_2_vector, weights
                 )
 
             restaurant_1.append(restaurant_1_id)
@@ -93,8 +101,9 @@ def _load_data() -> pd.DataFrame:
 
     return merged_df
 
+
 def get_restaurant_similarities(
-    distance_metric: str = "cosine_similarity"
+    distance_metric: str = "cosine_similarity", weights: np.ndarray = None
 ) -> pd.DataFrame:
     """
     Loads the data, pre-processes it, and computes the pairwise restaurant similarities.
@@ -103,7 +112,8 @@ def get_restaurant_similarities(
       - similarities (pd.DataFrame): a DataFrame with 3 columns "restaurant_1," "restaurant_2", and "similarity"
     """
     df = _preprocess_restaurant_data(_load_data())
-    return _get_item_similarities(df, distance_metric)
+    return _get_item_similarities(df, distance_metric, weights)
+
 
 def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -137,8 +147,3 @@ def get_train_test_split() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return ratings_df, pd.DataFrame(
         {"userID": user_ids, "placeID": restaurant_ids, "rating": ratings}
     )
-
-
-train_df, test_df = get_train_test_split()
-print(train_df.head())
-print(test_df.head())

@@ -9,10 +9,6 @@ def euclidean_distance(X: np.ndarray, Y: np.ndarray) -> float:
   return (np.sum((X - Y) ** 2)) ** 0.5
 
 def weighted_cosine_similarity(X: np.ndarray, Y: np.ndarray, weights: np.ndarray) -> float:
-  """Weighted cosine similarity function."""
-  return (X.T @ Y) / ((X.T @ X)**0.5 * (Y.T @ Y)**0.5) * weights
-
-def weighted_cosine_similarity(X: np.ndarray, Y: np.ndarray, weights: np.ndarray) -> float:
     """Weighted cosine similarity function."""
     weighted_X = X * np.sqrt(weights)
     weighted_Y = Y * np.sqrt(weights)

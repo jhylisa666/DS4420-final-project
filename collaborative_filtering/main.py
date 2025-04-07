@@ -5,6 +5,7 @@ from data import (
     get_user_similarities,
 )
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
 
 
 class HybridFiltering:
@@ -63,6 +64,7 @@ class HybridFiltering:
             top_k_similarities_df["similarity"].values,
             [],
         )
+        average_restaurant_ratings, user_similarity_ranges = [], []
         # For each restaurant, get the users who have rated the restaurant
         for restaurant_id in top_k_similar_restaurant_ids:
             user_ratings_df = self.train_df[
@@ -97,6 +99,7 @@ class HybridFiltering:
                 user_similarities_df["similarity"].values,
                 [],
             )
+            user_similarity_ranges.append(user_similarities[0] - user_similarities[-1])
             for _, row in user_similarities_df.iterrows():
                 similar_user_id = (
                     row["user_1"] if row["user_1"] != user_id else row["user_2"]
@@ -111,11 +114,13 @@ class HybridFiltering:
             restaurant_ratings.append(
                 user_ratings.dot(user_similarities) / user_similarities.sum()
             )
+            average_restaurant_ratings.append(np.mean(user_ratings))
 
         restaurant_ratings = np.asarray(restaurant_ratings)
+
         return (
             restaurant_ratings.dot(restaurant_similarities)
-            / restaurant_similarities.sum()
+            / restaurant_similarities.sum(), average_restaurant_ratings, user_similarity_ranges
         )
 
 
@@ -126,10 +131,13 @@ def main():
     _, test_df = get_train_test_split()
     preds, gt = [], test_df["rating"].values
 
+    all_restaurant_average_ratings, all_user_similarity_ranges = [], []
     for index in range(test_df.shape[0]):
         user_id = test_df.iloc[index]["userID"]
         restaurant_id = test_df.iloc[index]["placeID"]
-        predicted_rating = hf.predict(user_id, restaurant_id, k=3)
+        predicted_rating, average_restaurant_ratings, user_similarity_ranges = hf.predict(user_id, restaurant_id, k=1)
+        all_restaurant_average_ratings.extend(average_restaurant_ratings)
+        all_user_similarity_ranges.extend(user_similarity_ranges)
 
         if predicted_rating > 1.3:
             preds.append(2)
@@ -139,6 +147,22 @@ def main():
             preds.append(0)
 
     print(classification_report(y_true=gt, y_pred=preds, zero_division=0))
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+
+    axs[0].hist(all_restaurant_average_ratings, bins=6, edgecolor='black')
+    axs[0].set_title("Histogram of Average Restaurant Ratings", fontsize=16)
+    axs[0].set_xlabel("Average Restaurant Ratings", fontsize=16)
+    axs[0].set_ylabel("Frequency", fontsize=16)
+
+    axs[1].hist(all_user_similarity_ranges, bins=10, edgecolor='black', color='red')
+    axs[1].set_title("Histogram of Top-K User Similarity Ranges", fontsize=16)
+    axs[1].set_xlabel("User Similarity Range", fontsize=16)
+    axs[1].set_ylabel("Frequency", fontsize=16)
+
+    plt.tight_layout()
+    plt.savefig('cf_histograms.png', dpi=300)
+    plt.show()
 
 if __name__ == "__main__":
     main()

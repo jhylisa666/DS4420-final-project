@@ -1,0 +1,197 @@
+---
+title: "final-project"
+author: "Haiyi Jiang"
+date: "2025-04-13"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(forecast)
+
+stack_overfl_qs <- read.csv('StackOverflowData.csv')
+head(stack_overfl_qs)
+
+stack_overfl_qs$month <- as.Date(paste0("01-", stack_overfl_qs$month), format="%d-%y-%b")
+print(head(stack_overfl_qs))
+
+timeseries <- stack_overfl_qs[, c('month', 'python')]
+timeseries <- na.omit(timeseries)
+
+python_ts <- ts(timeseries$python, frequency=12)
+head(timeseries)
+
+
+if(length(python_ts) >= 2*12) {
+  decomp1 <- decompose(python_ts, type = "multiplicative")
+  decomp2 <- decompose(python_ts, type = "additive")
+} else {
+  message("Not enough periods for decompose(), using STL instead")
+  decomp1 <- stl(ts(timeseries$python, frequency=10), s.window="periodic")
+  decomp2 <- stl(ts(timeseries$python, frequency=5), s.window="periodic")
+}
+
+
+par(mfrow=c(4,1), mar=c(3,4,2,2))
+
+if(exists("decomp1") && "x" %in% names(decomp1)) {
+  plot(decomp1$x, main="Decomposition of Python Qs asked over time", ylab="Observed")
+  plot(decomp1$trend, main="", ylab="Trend")
+  plot(decomp1$seasonal, main="", ylab="Seasonal")
+  plot(decomp1$random, main="", ylab="Residual")
+} else {
+  plot(python_ts, main="Decomposition of Python Qs asked over time", ylab="Observed")
+  plot(decomp1$time.series[,"trend"], main="", ylab="Trend")
+  plot(decomp1$time.series[,"seasonal"], main="", ylab="Seasonal")
+  plot(decomp1$time.series[,"remainder"], main="", ylab="Residual")
+}
+
+
+
+```
+```{r}
+library(tidyverse)
+library(forecast)
+library(tseries)
+library(lubridate)
+library(Metrics)  
+
+stack_overfl_qs <- read.csv('StackOverflowData.csv')
+stack_overfl_qs$month <- as.Date(paste0("01-", stack_overfl_qs$month), format="%d-%y-%b")
+timeseries <- stack_overfl_qs[, c('month', 'python')]
+timeseries <- na.omit(timeseries)
+rownames(timeseries) <- as.character(timeseries$month)
+
+for (i in 1:10) {
+  lag_col_name <- paste("Lag", i)
+  timeseries[[lag_col_name]] <- lag(timeseries$python, i)
+}
+
+strikeout <- na.omit(timeseries)
+head(strikeout)
+
+series <- timeseries$python
+par(mfrow=c(1,1))
+acf(series, main="python Qs saked ACF Plot")
+
+pacf(series, main="Python values PACF Plot")
+
+train_size <- floor(0.8 * nrow(timeseries))
+train_data <- timeseries[1:train_size, ]
+test_data <- timeseries[(train_size+1):nrow(timeseries), ]
+
+y_train <- train_data$python
+y_test <- test_data$python
+
+plot(timeseries$month, timeseries$python, type="l", 
+     xlab="Year", ylab="Python Rate", 
+     main="Python Qs over Training Data")
+legend("topleft", legend=c("(Training) Python Rate"), lty=1)
+
+
+
+```
+```{r}
+library(forecast)
+library(tseries)
+library(lubridate)
+
+
+y_train_ts <- ts(train_data$python)
+
+
+ar_model <- Arima(y_train_ts, order=c(1,0,0))
+
+summary(ar_model)
+
+ar_pred <- forecast(ar_model, h=length(test_data$python))
+
+pred_data2 <- data.frame(
+  Year = test_data$month,
+  pred_Python_Qs = as.numeric(ar_pred$mean)
+)
+
+rownames(pred_data2) <- as.character(pred_data2$Year)
+
+head(pred_data2)
+
+plot(test_data$month, test_data$python, type="l", ylim=range(c(test_data$python, pred_data2$pred_Python_Qs)),
+     xlab="Year", ylab="Python Qs", main="AR Model Predictions", col="blue")
+lines(test_data$month, pred_data2$pred_Python_Qs, col="orange", lty=2)
+legend("topleft", legend=c("Actual Python Qs", "AR Predicted Python Qs"), 
+       col=c("blue", "orange"), lty=c(1,2))
+
+
+
+```
+```{r}
+library(forecast)
+library(Metrics)
+
+
+full_pred <- predict(ar_model, n.ahead = length(y_test))
+
+
+ar_pred <- c(fitted(ar_model), full_pred$pred)
+
+
+ar_pred <- ar_pred[!is.na(ar_pred)]
+
+
+mae_val <- mae(y_test, ar_pred)
+rmse_val <- rmse(y_test, ar_pred)
+
+cat(sprintf("Mean Absolute Error: %.2f\n", mae_val))
+cat(sprintf("Root Mean Squared Error: %.2f\n", rmse_val))
+
+
+```
+```{r}
+library(forecast)
+library(Metrics)
+
+arma_model <- Arima(y_train, order=c(5,1,10))
+
+
+summary(arma_model)
+
+arma_forecast <- forecast(arma_model, h=length(y_test))
+arma_pred <- arma_forecast$mean
+
+pred_data <- data.frame(
+  Year = test_data$month,
+  python = as.numeric(arma_pred)
+)
+
+rownames(pred_data) <- as.character(pred_data$Year)
+
+head(pred_data)
+
+plot(test_data$month, test_data$python, type="l", 
+     xlab="Year", ylab="Python Qs", main="ARIMA Model Predictions",
+     col="blue")
+lines(pred_data$Year, pred_data$python, col="orange", lty=2)
+legend("topleft", legend=c("Python CloQsse", "ARIMA Predicted Python Qs"), 
+       col=c("blue", "orange"), lty=c(1,2))
+
+mae_val <- mae(y_test, arma_pred)
+rmse_val <- rmse(y_test, arma_pred)
+
+cat(sprintf("Mean Absolute Error: %.2f\n", mae_val))
+cat(sprintf("Root Mean Squared Error: %.2f\n", rmse_val))
+
+mae_alt <- mean(abs(y_test[1] - arma_pred[1]))
+rmse_alt <- sqrt(mean((y_test[1] - arma_pred[1])^2))
+
+cat(sprintf("Mean Absolute Error (base R): %.2f\n", mae_alt))
+cat(sprintf("Root Mean Squared Error (base R): %.2f\n", rmse_alt))
+
+mae_all <- mae(y_test, arma_pred)
+rmse_all <- rmse(y_test, arma_pred)
+cat(sprintf("\nMetrics for full test period:\n"))
+cat(sprintf("Mean Absolute Error (all): %.2f\n", mae_all))
+cat(sprintf("Root Mean Squared Error (all): %.2f\n", rmse_all))
+```
+
+
